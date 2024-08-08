@@ -7,6 +7,10 @@ const ISO6391 = require("iso-639-1");
 const { FunctionDeclarationSchemaType } = require("@google/generative-ai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const speech = require("@google-cloud/speech");
+const {uploadData, getFirebaseApp, initializeFirebaseApp, getData, uploadFoodNames, getFoodNames} = require("./firebase");
+
+
+initializeFirebaseApp();
 
 // Imports the Google Cloud client library
 const textToSpeech = require("@google-cloud/text-to-speech");
@@ -21,8 +25,16 @@ app.use(cors());
 app.use(express.json());
 
 const itinerary = require("./routes/itinerary");
+const { get } = require("http");
 app.use("/api/itinerary", itinerary);
 
+
+
+app.get("/testgetData", async (req, res) => {
+  const data = await getData("users");
+  res.json(data);
+}
+)
 /*
 app.post("/test", async (req, res) => {
   console.log(req.body.artist);
@@ -1032,6 +1044,12 @@ app.post("/editText", async (req, res) => {
   }
 });
 
+app.get("/testupload", async (req, res) => {
+  await uploadData("test");
+  res.send("Hello World!");
+}
+)
+
 app.post("/textToSpeech", async (req, res) => {
   // Creates a client
   const client = new textToSpeech.TextToSpeechClient();
@@ -1047,6 +1065,8 @@ app.post("/textToSpeech", async (req, res) => {
         } preferences ${JSON.stringify(food.preferences)}`
     )
     .join(", ");
+
+  uploadFoodNames(req.body.userId,req.body.order);  
 
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
@@ -1129,12 +1149,16 @@ app.post("/uploadImage", upload.single("file"), async (req, res) => {
     },
   });
 
+  foodName = await getFoodNames(req.body.userId);
+  console.log(foodName);
   const response = await axios.get(
     `https://v6.exchangerate-api.com/v6/${process.env.CURRENCY_API_KEY}/latest/${req.body.convertTo}`
   );
 
   const exchangeRate = response.data.conversion_rates[req.body.convertFrom];
   console.log(exchangeRate);
+
+
 
   // Print the response.
   try {
@@ -1146,7 +1170,11 @@ app.post("/uploadImage", upload.single("file"), async (req, res) => {
         },
       },
       {
-        text: `Given the image first identify if the image is a menu , then convert the food's name from ${req.body.translateFromLanguage} to ${req.body.translateToLanguage}, the generated food description should also be in ${req.body.translateToLanguage} using the provided Json schema .convert the price from ${req.body.convertFrom} to ${req.body.convertTo} where the current exchange rate is 1 ${req.body.convertTo} = ${exchangeRate} ${req.body.convertFrom}
+        text: `Given the image first identify if the image is a menu , 
+        then convert the food's name from ${req.body.translateFromLanguage} to ${req.body.translateToLanguage}, 
+        the generated food description should also be in ${req.body.translateToLanguage} using the provided 
+        Json schema .convert the price from ${req.body.convertFrom} to ${req.body.convertTo} where the current exchange rate is 1 ${req.body.convertTo} = ${exchangeRate} ${req.body.convertFrom} 
+        beside based on user order history see if the food is recommended , user history : ${foodName}, you can infer if this is recommended based on what the food is made of, not just the name for example user ordered food related to chicken , you can recommend chicken dishes.,
         "type": "object",
   "properties": {
     "isFoodMenu": {
@@ -1159,10 +1187,14 @@ app.post("/uploadImage", upload.single("file"), async (req, res) => {
       "items": {
         "type": "object",
         "properties": {
-        "id": {
-                           "type": "number",
-                           "description": "Unique identifier starting from 1"
-                         },
+          "recommended": {
+            "type": "boolean",
+            "description": "based on user order history see if the food is recommended , user history : ${foodName} you can infer if this is recommended based on what the food is made of, not just the name for example user ordered food related to chicken , you can recommend chicken dishes." 
+          },
+          "id": {
+            "type": "number",
+            "description": "Unique identifier starting from 1"
+          },
           "originalName": {
             "type": "string",
             "description": "The original name of the food on the menu. "
