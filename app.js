@@ -7,7 +7,7 @@ const ISO6391 = require("iso-639-1");
 const { FunctionDeclarationSchemaType } = require("@google/generative-ai");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const speech = require("@google-cloud/speech");
-const {uploadData, getFirebaseApp, initializeFirebaseApp, getData, uploadFoodNames, getFoodNames} = require("./firebase");
+const {uploadData, getFirebaseApp, initializeFirebaseApp, getData, uploadFoodNames, getFoodNames, uploadPreferences, getPreferences} = require("./firebase");
 
 
 initializeFirebaseApp();
@@ -457,14 +457,18 @@ app.post("/hello", async (req, res) => {
 });
 */
 app.post("/foodPreference", async (req, res) => {
-  console.log(req.body);
+
+  preferences = await getPreferences(req.body.userId);
+
   const requestBody = {
     contents: [
       {
         parts: [
           {
             text: `Write me a list of possible food preference/options for diner that might want to add or skip in two different language languageOfDiner in (${req.body.translateToLanguage}) and languageOfWaiter in ${req.body.translateFromLanguage} where the diner ordering ${req.body.foodName}, for food preference , be logical 
+                  you can infer based on the user previous preferences ${preferences}  and based on the food
                    Each preference should have an 'id' starting from 1 , a 'preference' string, and a 'selected' boolean (default is false)
+                   
                    .
                    Output using this JSON schema: {
                      "type": "array",
@@ -518,7 +522,6 @@ app.post("/foodPreference", async (req, res) => {
 
     const jsonArrayString = `${response.data.candidates[0].content.parts[0].text}`;
     const preferencesArray = JSON.parse(jsonArrayString);
-    console.log(preferencesArray);
     res.json(preferencesArray);
   } catch (error) {
     console.error(error);
@@ -1066,7 +1069,9 @@ app.post("/textToSpeech", async (req, res) => {
     )
     .join(", ");
 
-  uploadFoodNames(req.body.userId,req.body.order);  
+  uploadFoodNames(req.body.userId,req.body.order);
+  uploadPreferences(req.body.userId,req.body.order);
+
 
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",

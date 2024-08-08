@@ -50,6 +50,57 @@ const uploadData = async (value)=>{
     }
 }
 
+const uploadPreferences = async (userId, order) => {
+    let allPreferences = [];
+
+    // Extract preferences from each food item in the order
+    order.forEach(food => {
+        if (food.preferences) {
+            food.preferences.forEach(preference => {
+                if (preference.preferenceInLanguageOfDiner) {
+                    allPreferences.push(preference.preferenceInLanguageOfDiner);
+                }
+            });
+        }
+    });
+
+    try {
+        const docRef = doc(firestoreDb, "preferencecollection", userId);
+        const docSnap = await getDoc(docRef);
+
+        let existingPreferences = [];
+
+        if (docSnap.exists()) {
+            const existingData = docSnap.data();
+            existingPreferences = existingData.preferences || [];
+        }
+
+        const updatedPreferences = [...existingPreferences, ...allPreferences];
+
+        await setDoc(docRef, { preferences: updatedPreferences }, { merge: true });
+        console.log("Preferences uploaded successfully");
+    } catch (e) {
+        console.error("Error updating document: ", e);
+    }
+};
+
+const getPreferences = async (userId) => {
+    try {
+        const docRef = doc(firestoreDb, "preferencecollection", userId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            return data.preferences || [];
+        } else {
+            console.log("No such document!");
+            return [];
+        }
+    } catch (error) {
+        console.error("Error getting document: ", error);
+        return [];
+    }
+};
 
 const uploadFoodNames = async (userId, order) => {
     const foodNames = order.map(food => food.foodname);
@@ -118,5 +169,7 @@ module.exports = {
     initializeFirebaseApp,
     getData,
     uploadFoodNames,
-    getFoodNames
+    getFoodNames,
+    uploadPreferences,
+    getPreferences
 }
